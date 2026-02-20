@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+
+    <!-- Icon cho màn hình chính iOS (Home Screen) - giống app thật -->
+    <!-- Ưu tiên 180x180 cho iPhone Retina thời iOS 12 -->
+    <link rel="apple-touch-icon" sizes="180x180" href="icon.png">
+    <!-- Các kích thước khác (tùy chọn, iOS tự resize nếu chỉ dùng 1 file) -->
+    <link rel="apple-touch-icon" sizes="152x152" href="icon.png">
+    <link rel="apple-touch-icon" sizes="120x120" href="icon.png">
+    <!-- Nếu bạn có file tên khác, thay đổi href tương ứng -->
+    <!-- Ví dụ dùng link công khai tạm (nếu host online): -->
+    <meta name="apple-mobile-web-app-title" content="SaiGonMe">
+    <title>SaiGonMe</title>
+<link rel="shortcut icon" type="image/png" href="icon.png"/>
+    <script type="text/javascript" src="utils.js"></script>
+  <script type="text/javascript" src="helper.js"></script>
+    <script type="text/javascript" src="int64.js"></script>
+    <script type="text/javascript" src="stages.js"></script>
+    <script type="text/javascript" src="offsets.js"></script>
+    <script type="text/javascript" src="pwn.js"></script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            height: 100%;
+            background: #000;
+            color: #e0ffe0;
+            font-family: -apple-system, Helvetica, Arial, sans-serif;
+            -webkit-text-size-adjust: 100%;
+            touch-action: manipulation;
+        }
+
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+
+        #app-wrapper {
+            width: 100%;
+            max-width: 400px;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        h1 {
+            font-size: 2.1rem;
+            color: #00ff9d;
+            text-shadow: 0 0 12px #00ff9d;
+            margin-bottom: 20px;
+            letter-spacing: 1.5px;
+        }
+
+        #log-container {
+            width: 96%;
+            background: #0a1a0a;
+            border: 1px solid #00cc66;
+            border-radius: 12px;
+            padding: 12px;
+            margin-bottom: 28px;
+            box-shadow: 0 0 16px rgba(0, 204, 102, 0.25);
+        }
+
+        #log {
+            max-height: 240px;
+            overflow-y: auto;
+            overflow-x: hidden;             /* Không cho cuộn ngang */
+            font-size: 14px;
+            line-height: 1.6;
+            white-space: pre-wrap;          /* Giữ khoảng trắng, xuống dòng tự động */
+            word-break: break-all;          /* Phá vỡ từ dài, xuống dòng */
+            word-wrap: break-word;          /* Fallback cho iOS cũ */
+            hyphens: auto;                  /* Tự động ngắt từ (nếu browser hỗ trợ) */
+            padding: 8px;
+        }
+
+        #log::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        #log::-webkit-scrollbar-track {
+            background: #0a1a0a;
+        }
+
+        #log::-webkit-scrollbar-thumb {
+            background: #00cc66;
+            border-radius: 10px;
+        }
+
+        .log-line {
+            margin-bottom: 6px;
+            padding: 3px 0;
+            border-bottom: 1px solid rgba(0, 204, 102, 0.1);
+            white-space: pre-wrap;
+            word-break: break-all;
+            word-wrap: break-word;
+            hyphens: auto;
+        }
+
+        .slide-container {
+            width: 96%;
+            max-width: 360px;
+        }
+
+        .slider-track {
+            position: relative;
+            height: 60px;
+            background: #111;
+            border: 2px solid #0066cc;
+            border-radius: 32px;
+            overflow: hidden;
+            box-shadow: inset 0 3px 10px rgba(0,0,0,0.8);
+        }
+
+        .slider-handle {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 80px;
+            height: 100%;
+            background: linear-gradient(to right, #0088ff, #0044cc);
+            color: white;
+            font-size: 30px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 30px;
+            box-shadow: 0 0 18px rgba(0, 136, 255, 0.6);
+            z-index: 2;
+        }
+
+        .slider-text {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #aaddff;
+            font-size: 18px;
+            font-weight: 500;
+            pointer-events: none;
+            z-index: 1;
+            text-align: center;
+            line-height: 1.2;
+            white-space: nowrap;
+            transition: opacity 0.4s;
+        }
+
+        .slider-text span {
+            display: inline-block;
+            vertical-align: middle;
+        }
+
+        .slider-text.faded {
+            opacity: 0.35;
+        }
+
+        .slider-text.active {
+            color: #00ff9d;
+        }
+
+        @media (max-width: 320px) {
+            h1 { font-size: 1.8rem; margin-bottom: 16px; }
+            #log { font-size: 13px; max-height: 200px; }
+            .slider-track { height: 54px; }
+            .slider-handle { width: 72px; font-size: 26px; }
+            .slider-text { font-size: 16px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="app-wrapper">
+
+        <h1>SaiGonMe</h1>
+
+        <div id="log-container">
+            <div id="log"></div>
+        </div>
+
+        <div class="slide-container">
+            <div class="slider-track">
+                <div class="slider-handle" id="sliderHandle">»»</div>
+                <div class="slider-text" id="sliderText">
+                    <span>Trượt để re-jailbreak</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // Fix height động cho iOS 12
+        function fixHeight() {
+            const realHeight = window.innerHeight;
+            document.body.style.height = realHeight + 'px';
+            document.documentElement.style.height = realHeight + 'px';
+            document.getElementById('app-wrapper').style.height = realHeight + 'px';
+        }
+        window.addEventListener('resize', fixHeight);
+        window.addEventListener('orientationchange', fixHeight);
+        window.addEventListener('load', fixHeight);
+        fixHeight();
+
+        // Hàm log với auto-scroll dọc
+        function log(message, color = '#e0ffe0') {
+            const logDiv = document.getElementById("log");
+            const line = document.createElement("div");
+            line.className = "log-line";
+            line.style.color = color;
+            line.textContent = message;
+            logDiv.appendChild(line);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        // Lấy thông tin thiết bị chi tiết hơn
+function getDeviceInfo() {
+    const ua = navigator.userAgent || '';
+    const isIOS = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
+
+    let iosVersion = 'Không xác định';
+    let buildNumber = 'Không xác định';
+    let webkitVersion = 'Không xác định';
+    let deviceModel = 'Không xác định';
+
+    if (isIOS) {
+        // Lấy version chính (ví dụ: 12.5.7)
+        const osMatch = ua.match(/OS (\d+([_]\d+)*)/);
+        if (osMatch) {
+            iosVersion = osMatch[1].replace(/_/g, '.');
+        }
+
+        // Cố gắng lấy build number (thường nằm sau version, dạng (16H81))
+        const buildMatch = ua.match(/\(([^)]+)\)/);
+        if (buildMatch && buildMatch[1].includes(';')) {
+            // Ví dụ: CPU iPhone10,3 like Mac OS X; en-us; 16H81
+            const parts = buildMatch[1].split(';');
+            if (parts.length >= 3) {
+                buildNumber = parts[parts.length - 1].trim(); // thường là build cuối
+            }
+        } else if (buildMatch) {
+            buildNumber = buildMatch[1].trim();
+        }
+
+        const wkMatch = ua.match(/AppleWebKit\/([\d.]+)/);
+        if (wkMatch) webkitVersion = wkMatch[1];
+
+        // Phần đoán model (có thể mở rộng thêm)
+        const w = screen.width;
+        const h = screen.height;
+        const dpr = window.devicePixelRatio || 1;
+
+        if (Math.min(w, h) === 320 && Math.max(w, h) === 568 && dpr === 2) {
+            deviceModel = 'iPhone 5s';
+        } else if (Math.min(w, h) === 375 && Math.max(w, h) === 667 && dpr === 2) {
+            deviceModel = 'iPhone 6/6s/7/8/SE';
+        } else if (Math.min(w, h) === 414 && Math.max(w, h) === 736 && dpr === 3) {
+            deviceModel = 'iPhone 6+/6s+/7+/8+';
+        } // bạn có thể thêm nhiều model hơn...
+    }
+
+    return { 
+        model: deviceModel, 
+        ios: iosVersion, 
+        build: buildNumber, 
+        webkit: webkitVersion 
+    };
+}
+
+        // Log khởi động
+        const info = getDeviceInfo();
+        //log("SaiGon12 Re-Jailbreak Tool", '#00ff9d');
+        log(`[+] Thiết bị: ${info.model}`, '#00ff9d');
+        log(`[+] iOS: ${info.ios}`, '#00ff9d');
+        log(`[+] WebKit: ${info.webkit}`, '#00ff9d');
+        log("[+] Đã sẵn sàng", '#aaffcc');
+       // log("Cảnh báo: Chỉ sử dụng trên thiết bị test hoặc jailbreak.", '#ffcc66');
+
+        // Error handler
+        window.onerror = function(msg, src, line) {
+            log(`[ERROR] ${msg} @ line ${line}`, '#ff5555');
+            return true;
+        };
+
+        // Slide logic
+        const handle = document.getElementById("sliderHandle");
+        const text   = document.getElementById("sliderText");
+        const track  = handle.parentElement;
+
+        let isDragging = false;
+        let startX = 0;
+        let currentX = 0;
+        let maxSlide = 0;
+
+        function updateMax() {
+            maxSlide = track.offsetWidth - handle.offsetWidth;
+        }
+
+        function setPos(x) {
+            currentX = Math.max(0, Math.min(x, maxSlide));
+            handle.style.webkitTransform = 'translateX(' + currentX + 'px)';
+            handle.style.transform = 'translateX(' + currentX + 'px)';
+
+            if (currentX > maxSlide * 0.7) {
+                text.classList.add("faded", "active");
+            } else {
+                text.classList.remove("faded", "active");
+            }
+        }
+
+        function onStart(e) {
+            isDragging = true;
+            updateMax();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            startX = clientX - currentX;
+            handle.style.webkitTransition = 'none';
+            handle.style.transition = 'none';
+            if (e.preventDefault) e.preventDefault();
+        }
+
+        function onMove(e) {
+            if (!isDragging) return;
+            if (e.preventDefault) e.preventDefault();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            setPos(clientX - startX);
+        }
+
+        function onEnd() {
+            if (!isDragging) return;
+            isDragging = false;
+            handle.style.webkitTransition = 'transform 0.4s ease-out';
+            handle.style.transition = 'transform 0.4s ease-out';
+
+            if (currentX > maxSlide * 0.82) {
+                text.querySelector('span').textContent = "Đang thực thi...";
+                setPos(maxSlide);
+
+                log("→ Đang thực thi...", '#ffff66');
+
+                setTimeout(() => {
+                    if (typeof pwn === 'function') {
+                        try {
+                            pwn();
+                            log("→ Exploit hoàn tất.", '#00ff9d');
+                        } catch (ex) {
+                            log("→ Lỗi exploit: " + ex.message, '#ff5555');
+                        }
+                    } else {
+                        log("[CẢNH BÁO] Hàm pwn() không tồn tại!", '#ffcc66');
+                    }
+                    setTimeout(reset, 3000);
+                }, 500);
+            } else {
+                setPos(0);
+            }
+        }
+
+        function reset() {
+            setPos(0);
+            text.querySelector('span').textContent = "Trượt để re-jailbreak";
+            text.classList.remove("faded", "active");
+        }
+
+        handle.addEventListener("mousedown", onStart);
+        handle.addEventListener("touchstart", onStart, false);
+        document.addEventListener("mousemove", onMove);
+        document.addEventListener("touchmove", onMove, false);
+        document.addEventListener("mouseup", onEnd);
+        document.addEventListener("touchend", onEnd);
+
+        window.addEventListener("resize", updateMax);
+    </script>
+
+</body>
+</html>
